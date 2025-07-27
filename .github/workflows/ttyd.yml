@@ -10,9 +10,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Update packages
+      - name: Install required packages
         run: |
-          sudo apt update && sudo apt install -y unzip curl wget
+          sudo apt update
+          sudo apt install -y unzip curl wget libjson-c-dev
 
       - name: Fetch vm-data branch if exists
         run: git fetch origin vm-data || echo "No vm-data branch found."
@@ -26,7 +27,7 @@ jobs:
 
       - name: Download and start ttyd
         run: |
-          wget -q https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd_linux.x86_64 -O ttyd
+          wget https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd_linux.x86_64 -O ttyd
           chmod +x ttyd
           ./ttyd -p 7681 bash &
 
