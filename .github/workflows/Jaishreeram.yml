@@ -9,8 +9,10 @@ jobs:
   start-vm:
     runs-on: ubuntu-latest
     timeout-minutes: 360  # 6 hours max
-    steps:
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    steps:
     - name: Checkout
       uses: actions/checkout@v3
 
@@ -25,7 +27,7 @@ jobs:
     - name: Install ttyd and Cloudflare Tunnel
       run: |
         sudo apt update
-        sudo apt install -y wget unzip
+        sudo apt install -y wget unzip rsync
 
         # Install ttyd
         wget https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64 -O ttyd
@@ -43,19 +45,22 @@ jobs:
         sleep 5
         cloudflared tunnel --url http://localhost:7681 --no-autoupdate > cf.log 2>&1 &
         sleep 10
-        echo "🚀 ttyd session is running. Check the Cloudflare logs below:"
+        echo "🚀 ttyd session is running. Access URL:"
         cat cf.log | grep -i "trycloudflare.com" || cat cf.log
 
     - name: Save Home Directory to Repo
       if: always()
       run: |
         mkdir -p save/data
-        cp -r ~/ save/data/
+
+        # Use rsync to avoid recursive copy
+        rsync -a --exclude='save' ~ save/data/
+
         cd save
         git init
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions"
-        git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+        git remote add origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}
         git checkout -b backup
         git add .
         git commit -m "Auto backup $(date)"
