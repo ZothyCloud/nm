@@ -1,0 +1,62 @@
+name: Persistent 12-Hour SSH VM with ttyd
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  start-vm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Restore Previous Files (from branch or artifacts)
+      run: |
+        mkdir -p restore
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+        git clone --depth 1 --single-branch --branch backup https://github.com/${{ github.repository }} restore || echo "No backup branch"
+        cp -r restore/data/* ~/ || echo "Nothing to restore"
+
+    - name: Install ttyd and Cloudflare Tunnel
+      run: |
+        sudo apt update
+        sudo apt install -y wget unzip
+
+        # Install ttyd
+        wget https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64 -O ttyd
+        chmod +x ttyd
+        sudo mv ttyd /usr/local/bin/
+
+        # Install cloudflared
+        wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O cloudflared
+        chmod +x cloudflared
+        sudo mv cloudflared /usr/local/bin/
+
+    - name: Start ttyd and Cloudflare Tunnel
+      run: |
+        nohup ttyd -p 7681 bash > ttyd.log 2>&1 &
+        sleep 5
+        cloudflared tunnel --url http://localhost:7681 --no-autoupdate > cf.log 2>&1 &
+        sleep 10
+        echo "🚀 ttyd session is running. Check the Cloudflare logs below:"
+        cat cf.log | grep -i "trycloudflare.com" || cat cf.log
+
+    - name: Save Home Directory to Repo
+      if: always()
+      run: |
+        mkdir -p save/data
+        cp -r ~/ save/data/
+        cd save
+        git init
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions"
+        git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+        git checkout -b backup
+        git add .
+        git commit -m "Auto backup $(date)"
+        git push -f origin backup
