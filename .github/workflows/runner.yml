@@ -1,27 +1,34 @@
 name: Run Cloudflare TTYD VM
 
-on:
-  workflow_dispatch:
+on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - name: ⬇️ Checkout Repository
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: 📁 Restore VM Data
-      run: |
-        git fetch origin vm-data
-        git checkout vm-data || git checkout -b vm-data
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y curl wget nodejs npm
 
-    - name: 🛠️ Setup SSHX-like Environment
-      run: |
-        sudo apt update
-        sudo apt install -y wget curl
+      - name: Make start.sh executable
+        run: chmod +x start.sh
 
-    - name: 🚀 Run start.sh
-      run: |
-        chmod +x start.sh
-        ./start.sh
+      - name: Run VM startup script
+        run: ./start.sh
+
+      - name: Save VM data to branch
+        if: always()
+        run: |
+          mkdir -p .vm_data
+          sudo cp -r /root /etc /var .vm_data || true
+          git config --global user.name 'ZothyBot'
+          git config --global user.email 'bot@zothycloud.com'
+          git fetch
+          git checkout -B vm-data
+          git add .vm_data
+          git commit -m "💾 Save VM state"
+          git push -f origin vm-data
