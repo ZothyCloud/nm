@@ -17,10 +17,10 @@ jobs:
           sudo apt update
           sudo apt install -y git curl unzip
 
-      - name: 🔁 Restore backup from branch vm-data (if exists)
+      - name: 🔁 Restore backup from vm-data (if it exists)
         run: |
           git fetch origin vm-data || echo "No vm-data branch found."
-          if git rev-parse --verify origin/vm-data >/dev/null 2>&1; then
+          if git show-ref --verify --quiet refs/remotes/origin/vm-data; then
             git switch -c vm-data origin/vm-data
             mkdir -p /home/runner/restored_data
             cp -r * /home/runner/restored_data/
@@ -29,14 +29,15 @@ jobs:
 
       - name: 🚀 Start ttyd on port 7681
         run: |
-          curl -sL https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd_linux.x86_64 -o ttyd
+          curl -L https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd_linux.x86_64 -o ttyd
           chmod +x ttyd
           nohup ./ttyd -p 7681 bash > ttyd.log 2>&1 &
 
       - name: 🌐 Start Cloudflare Tunnel
         run: |
-          curl -s https://raw.githubusercontent.com/cloudflare/cloudflared/master/install.sh | bash
-          nohup cloudflared tunnel --url http://localhost:7681 > tunnel.log 2>&1 &
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+          chmod +x cloudflared
+          nohup ./cloudflared tunnel --url http://localhost:7681 > tunnel.log 2>&1 &
           sleep 10
           grep -Eo "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" tunnel.log || echo "Tunnel URL not found."
 
