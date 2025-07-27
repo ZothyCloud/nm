@@ -1,36 +1,25 @@
 #!/bin/bash
 
-# Make sure script exits on error
-set -e
+# Create persistent volume directory if not exists
+mkdir -p /vm_data
+ln -s /vm_data ~/vm_data
 
 # Install dependencies
-sudo apt update
-sudo apt install -y git curl wget build-essential cmake npm nodejs
-
-# Install cloudflared
-wget -O cloudflared.tgz https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.tgz
-tar -xvzf cloudflared.tgz
-sudo mv cloudflared /usr/local/bin/
-chmod +x /usr/local/bin/cloudflared
+sudo apt update && sudo apt install -y curl wget npm
 
 # Install ttyd
-git clone https://github.com/tsl0922/ttyd.git
-cd ttyd
-mkdir build && cd build
-cmake ..
-make
-sudo make install
-cd ../..
-rm -rf ttyd
+npm install -g ttyd
 
-# Start ttyd in background
-nohup ttyd -p 7681 bash > ttyd.log 2>&1 &
+# Install cloudflared
+wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared-linux-amd64.deb
 
-# Start Cloudflare tunnel
-nohup cloudflared tunnel --url http://localhost:7681 > tunnel.log 2>&1 &
+# Start TTYD and Cloudflare Tunnel
+echo "🌐 Starting TTYD..."
+nohup ttyd bash &
 
-echo "✅ VM Ready with TTYD + Cloudflare"
-echo "Sleeping to keep container alive..."
+echo "☁️ Starting Cloudflare tunnel..."
+nohup cloudflared tunnel --url http://localhost:7681 &
 
-# Keep alive for 6 hours
-sleep 6h
+# Sleep forever to keep GitHub Actions VM alive
+sleep infinity
