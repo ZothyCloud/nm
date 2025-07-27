@@ -1,62 +1,40 @@
 name: Persistent 12-Hour SSH VM with ttyd
 
 on:
-  schedule:
-    - cron: "0 */6 * * *"  # Every 6 hours
   workflow_dispatch:
 
 jobs:
   start-vm:
     runs-on: ubuntu-latest
-    timeout-minutes: 360  # Max GitHub Action time (6 hours)
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: 📁 Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Restore Previous Files (from branch)
-      run: |
-        mkdir -p restore
-        git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions"
-        git clone --depth 1 --single-branch --branch backup https://github.com/${{ github.repository }} restore || echo "No backup branch"
-        cp -r restore/data/* ~/ || echo "Nothing to restore"
+      - name: ⏬ Download & install ttyd + SSHX
+        run: |
+          curl -s https://raw.githubusercontent.com/AnonyX69420/SSHX/main/install.sh | bash
+          curl -Lo ttyd https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd_linux.x86_64
+          chmod +x ttyd
+          sudo mv ttyd /usr/local/bin/
 
-    - name: Install ttyd and Cloudflare Tunnel
-      run: |
-        sudo apt update
-        sudo apt install -y wget unzip
+      - name: 🚀 Start ttyd & SSHX
+        run: |
+          nohup ttyd -p 7681 bash > ttyd.log 2>&1 &
+          sshx --name "ZothyBackupVM" --runtime 6h &
 
-        # Install ttyd
-        wget https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64 -O ttyd
-        chmod +x ttyd
-        sudo mv ttyd /usr/local/bin/
+      - name: 🕒 Sleep for setup
+        run: sleep 15
 
-        # Install cloudflared
-        wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O cloudflared
-        chmod +x cloudflared
-        sudo mv cloudflared /usr/local/bin/
+      - name: 📦 Save VM Data
+        run: |
+          mkdir -p save/data
+          rsync -a --exclude='save' /home/runner/ save/data/
 
-    - name: Start ttyd and Cloudflare Tunnel
-      run: |
-        nohup ttyd -p 7681 bash --login -i > ttyd.log 2>&1 &
-        sleep 5
-        nohup cloudflared tunnel --url http://localhost:7681 --no-autoupdate > cf.log 2>&1 &
-        sleep 10
-        echo "🚀 ttyd session is running. Access it here:"
-        cat cf.log | grep -i "trycloudflare.com" || cat cf.log
-
-    - name: Save Home Directory to Repo
-      if: always()
-      run: |
-        mkdir -p save/data
-        cp -r ~/ save/data/
-        cd save
-        git init
-        git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions"
-        git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-        git checkout -b backup
-        git add .
-        git commit -m "Auto backup $(date)"
-        git push -f origin backup
+      - name: 💾 Commit saved data
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git add save/data
+          git commit -m "🗃️ Save VM data - $(date)" || echo "Nothing to commit"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} HEAD:vm-data
