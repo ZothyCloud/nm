@@ -6,23 +6,31 @@ on:
 jobs:
   start-vm:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Fetch vm-data branch if exists
-      run: git fetch origin vm-data || echo "No vm-data branch found."
+      - name: Fetch vm-data branch
+        run: |
+          git fetch origin vm-data || echo "No vm-data branch found."
+          git checkout vm-data -- vm_data || echo "No vm_data to restore"
 
-    - name: Restore VM data (if any)
-      run: |
-        if [ -d vm_data ]; then
-          echo "Restoring VM data..."
-          cp -r vm_data/* .
-        fi
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y unzip curl
 
-    - name: Make start.sh executable
-      run: chmod +x ./start.sh
+      - name: Download ttyd
+        run: |
+          wget https://github.com/tsl0922/ttyd/releases/download/1.7.3/ttyd_linux.x86_64 -O ttyd
+          chmod +x ttyd
 
-    - name: Run start.sh
-      run: ./start.sh
+      - name: Download cloudflared
+        run: |
+          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O cloudflared
+          chmod +x cloudflared
+
+      - name: Run start.sh
+        run: |
+          chmod +x start.sh
+          ./start.sh
