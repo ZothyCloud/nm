@@ -7,35 +7,37 @@ jobs:
   start-vm:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      - name: Install required packages
-        run: |
-          sudo apt update
-          sudo apt install -y unzip curl wget libjson-c-dev
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Fetch vm-data branch if exists
-        run: git fetch origin vm-data || echo "No vm-data branch found."
+    - name: Fetch VM data from backup branch
+      run: |
+        git fetch origin vm-data || echo "No vm-data branch found."
+        if [ -d vm_data ]; then
+          echo "vm_data already exists"
+        else
+          git clone --branch vm-data https://github.com/${{ github.repository }}.git vm_data || echo "No vm_data directory to clone."
+        fi
 
-      - name: Restore VM backup if available
-        run: |
-          if [ -d vm_data ]; then
-            echo "Restoring backup..."
-            cp -r vm_data/* .
-          fi
+    - name: Install required packages
+      run: |
+        sudo apt update
+        sudo apt install -y unzip curl
 
-      - name: Download and start ttyd
-        run: |
-          wget https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd_linux.x86_64 -O ttyd
-          chmod +x ttyd
-          ./ttyd -p 7681 bash &
+    - name: Download and start ttyd
+      run: |
+        wget https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64 -O ttyd
+        chmod +x ttyd
+        ./ttyd -p 7681 bash &
 
-      - name: Download and start cloudflared tunnel
-        run: |
-          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O cloudflared
-          chmod +x cloudflared
-          ./cloudflared tunnel --url http://localhost:7681 &
+    - name: Install Cloudflared and Start Tunnel
+      run: |
+        wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        sudo dpkg -i cloudflared-linux-amd64.deb
+        ./cloudflared tunnel --url http://localhost:7681 &
 
-      - name: Sleep for 12 hours
-        run: sleep 43200
+    - name: Sleep to keep the VM alive
+      run: |
+        echo "✅ VM started. ttyd is exposed via Cloudflare."
+        sleep infinity
