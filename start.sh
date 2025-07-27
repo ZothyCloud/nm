@@ -1,22 +1,36 @@
 #!/bin/bash
 
-# Restore VM data if exists
-if [ -d ".vm_data" ]; then
-  echo "✅ Restoring VM data..."
-  cp -r .vm_data/* /
-fi
+# Make sure script exits on error
+set -e
 
-# Install SSHX
-curl -fsSL https://get.cloudflared.com | bash
-npm install -g ttyd
+# Install dependencies
+sudo apt update
+sudo apt install -y git curl wget build-essential cmake npm nodejs
 
-# Start ttyd with bash shell
-echo "🌐 Starting TTYD..."
-nohup ttyd -p 7681 bash &
+# Install cloudflared
+wget -O cloudflared.tgz https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.tgz
+tar -xvzf cloudflared.tgz
+sudo mv cloudflared /usr/local/bin/
+chmod +x /usr/local/bin/cloudflared
+
+# Install ttyd
+git clone https://github.com/tsl0922/ttyd.git
+cd ttyd
+mkdir build && cd build
+cmake ..
+make
+sudo make install
+cd ../..
+rm -rf ttyd
+
+# Start ttyd in background
+nohup ttyd -p 7681 bash > ttyd.log 2>&1 &
 
 # Start Cloudflare tunnel
-echo "☁️ Starting Cloudflare tunnel..."
-nohup cloudflared tunnel --url http://localhost:7681 &
+nohup cloudflared tunnel --url http://localhost:7681 > tunnel.log 2>&1 &
 
-# Keep process alive
-sleep infinity
+echo "✅ VM Ready with TTYD + Cloudflare"
+echo "Sleeping to keep container alive..."
+
+# Keep alive for 6 hours
+sleep 6h
