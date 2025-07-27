@@ -1,25 +1,43 @@
 #!/bin/bash
 
-# Create persistent volume directory if not exists
+set -e
+
+echo "🔧 Setting up environment..."
+
+# Link VM data (for persistent storage)
 mkdir -p /vm_data
-ln -s /vm_data ~/vm_data
-
-# Install dependencies
-sudo apt update && sudo apt install -y curl wget npm
-
-# Install ttyd
-npm install -g ttyd
+ln -s /home/runner/work/nm/nm /vm_data || true
 
 # Install cloudflared
-wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-sudo dpkg -i cloudflared-linux-amd64.deb
+if [ ! -f "./cloudflared" ]; then
+  echo "⬇️ Installing cloudflared..."
+  curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+  chmod +x cloudflared
+fi
 
-# Start TTYD and Cloudflare Tunnel
-echo "🌐 Starting TTYD..."
-nohup ttyd bash &
+# Install ttyd
+if [ ! -f "./ttyd" ]; then
+  echo "⬇️ Installing ttyd..."
+  curl -LO https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64
+  mv ttyd.x86_64 ttyd
+  chmod +x ttyd
+fi
 
-echo "☁️ Starting Cloudflare tunnel..."
-nohup cloudflared tunnel --url http://localhost:7681 &
+# Start ttyd (web-based terminal)
+echo "🚀 Starting ttyd on port 7681..."
+./ttyd -p 7681 bash &
+sleep 5
 
-# Sleep forever to keep GitHub Actions VM alive
+# Start Cloudflare tunnel
+echo "🌐 Starting Cloudflare tunnel..."
+./cloudflared tunnel --url http://localhost:7681 --no-autoupdate &
+
+# Debug: Show running processes
+ps aux | grep ttyd
+ps aux | grep cloudflared
+
+echo "✅ TTYD and Cloudflare started."
+echo "🌍 Open the Cloudflare URL shown above (it appears in logs)."
+
+# Keep container running
 sleep infinity
