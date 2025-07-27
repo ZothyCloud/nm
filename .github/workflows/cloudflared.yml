@@ -1,0 +1,23 @@
+name: Run Cloudflare TTYD VM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Switch to vm-data branch
+        run: |
+          git fetch origin vm-data
+          git checkout vm-data || git checkout -b vm-data
+
+      - name: Run start.sh script
+        run: |
+          chmod +x start.sh
+          ./start.sh
