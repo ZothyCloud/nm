@@ -1,24 +1,28 @@
 #!/bin/bash
 
+# Create a persistent folder if not exists
 mkdir -p vm_data
 
-echo "Starting ttyd on port 7681..."
+# Move into it
+cd vm_data
+
+# Update & install tools
+sudo apt update
+sudo apt install -y unzip curl
+
+# Download ttyd
+wget https://github.com/tsl0922/ttyd/releases/download/1.7.4/ttyd.x86_64 -O ttyd
+chmod +x ttyd
+
+# Download cloudflared
+wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O cloudflared
+chmod +x cloudflared
+
+# Start ttyd in background
 ./ttyd -p 7681 bash &
 
-echo "Starting Cloudflare Tunnel..."
-./cloudflared tunnel --url http://localhost:7681 &
-sleep 5
+# Start cloudflared tunnel
+./cloudflared tunnel --url http://localhost:7681 --no-autoupdate &
 
-echo "VM is running. Make your changes inside the terminal."
-echo "Auto-saving to vm-data branch every 10 minutes..."
-
-while true; do
-  git config --global user.name "ZothyBot"
-  git config --global user.email "zothycloud@example.com"
-
-  git add vm_data
-  git commit -m "Auto backup at $(date)" || echo "No changes to commit."
-  git push origin HEAD:vm-data
-
-  sleep 600  # 10 minutes
-done
+# Keep the runner alive
+sleep infinity
