@@ -45,3 +45,5 @@ jobs:
         run: |
           chmod +x start.sh || true
           ./start.sh || echo "No start.sh found or failed"
+          echo "✅ Program finished. Keeping VM alive..."
+          sleep 43200  # sleep for 12 hours
