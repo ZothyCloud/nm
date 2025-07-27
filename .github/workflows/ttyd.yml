@@ -6,47 +6,23 @@ on:
 jobs:
   start-vm:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Restore vm_data backup (if exists)
-        run: |
-          git fetch origin vm-data || echo "No vm-data branch found."
-          if [ -d vm_data ]; then
-            echo "Backup already present locally."
-          else
-            git clone --single-branch --branch vm-data https://github.com/${{ github.repository }}.git tmpdata || echo "No backup found to restore"
-            if [ -d tmpdata/vm_data ]; then
-              mv tmpdata/vm_data ./vm_data
-              echo "Backup restored successfully."
-            fi
-          fi
+    - name: Fetch vm-data branch if exists
+      run: git fetch origin vm-data || echo "No vm-data branch found."
 
-      - name: Install required tools
-        run: |
-          sudo apt update
-          sudo apt install -y unzip curl
+    - name: Restore VM data (if any)
+      run: |
+        if [ -d vm_data ]; then
+          echo "Restoring VM data..."
+          cp -r vm_data/* .
+        fi
 
-      - name: Download ttyd
-        run: |
-          wget https://github.com/tsl0922/ttyd/releases/download/1.7.6/ttyd_linux.x86_64 -O ttyd
-          chmod +x ttyd
+    - name: Make start.sh executable
+      run: chmod +x ./start.sh
 
-      - name: Download and install Cloudflared
-        run: |
-          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-          sudo dpkg -i cloudflared-linux-amd64.deb
-
-      - name: Start ttyd and Cloudflare Tunnel
-        run: |
-          ./ttyd bash > ttyd.log 2>&1 &
-          sleep 5
-          cloudflared tunnel --url http://localhost:7681 > tunnel.log 2>&1 &
-          sleep 10
-          echo "✅ Tunnel should be ready."
-          echo "🌐 Cloudflare Tunnel URL:"
-          grep -o 'https://[-a-z0-9]*\.trycloudflare\.com' tunnel.log || echo "❌ Tunnel URL not found"
-
-      - name: Sleep for 12 hours to keep VM alive
-        run: sleep 43200
+    - name: Run start.sh
+      run: ./start.sh
