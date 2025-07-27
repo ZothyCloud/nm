@@ -1,0 +1,27 @@
+name: Run Cloudflare TTYD VM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: ⬇️ Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: 📁 Restore VM Data
+      run: |
+        git fetch origin vm-data
+        git checkout vm-data || git checkout -b vm-data
+
+    - name: 🛠️ Setup SSHX-like Environment
+      run: |
+        sudo apt update
+        sudo apt install -y wget curl
+
+    - name: 🚀 Run start.sh
+      run: |
+        chmod +x start.sh
+        ./start.sh
