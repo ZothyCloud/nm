@@ -7,41 +7,40 @@ jobs:
   start-vm:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: 📦 Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-      - name: Install dependencies
+      - name: 🛠️ Install dependencies
         run: |
           sudo apt update
           sudo apt install -y git curl unzip
 
-      - name: Restore previous backup
+      - name: 🔁 Restore backup from branch vm-data (if exists)
         run: |
-          echo "🔄 Restoring previous backup from branch vm-data..."
-          git fetch origin vm-data
-          git checkout vm-data -- vm_data || echo "No previous backup found."
-          echo "✅ Backup restored (if any)."
+          git fetch origin vm-data || echo "No vm-data branch found."
+          if git rev-parse --verify origin/vm-data >/dev/null 2>&1; then
+            git switch -c vm-data origin/vm-data
+            mkdir -p /home/runner/restored_data
+            cp -r * /home/runner/restored_data/
+            cd /home/runner/work/nm/nm
+          fi
 
-      - name: Move to next steps
+      - name: 🚀 Start ttyd on port 7681
         run: |
-          echo "🚀 Moving to next program..."
-          chmod +x vm_data/start.sh || true
-          ./vm_data/start.sh || echo "❗ start.sh failed or not found."
-          echo "✅ Continued with main program."
-
-      - name: Keep VM alive for 12 hours with ttyd (optional)
-        run: |
-          curl -s https://api.github.com/repos/tsl0922/ttyd/releases/latest \
-            | grep "browser_download_url.*linux.x86_64" \
-            | cut -d '"' -f 4 \
-            | wget -i - -O ttyd
+          curl -sL https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd_linux.x86_64 -o ttyd
           chmod +x ttyd
-          ./ttyd -p 7681 bash &
-          echo "🌐 ttyd running on port 7681"
-          sleep 43200  # 12 hours
+          nohup ./ttyd -p 7681 bash > ttyd.log 2>&1 &
+
+      - name: 🌐 Start Cloudflare Tunnel
+        run: |
+          curl -s https://raw.githubusercontent.com/cloudflare/cloudflared/master/install.sh | bash
+          nohup cloudflared tunnel --url http://localhost:7681 > tunnel.log 2>&1 &
+          sleep 10
+          grep -Eo "https://[a-zA-Z0-9.-]+\.trycloudflare\.com" tunnel.log || echo "Tunnel URL not found."
+
+      - name: ▶️ Run your next program (optional)
+        run: |
+          chmod +x start.sh || true
+          ./start.sh || echo "No start.sh found or failed"
