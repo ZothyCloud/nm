@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 360
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Switch to vm-data branch
@@ -17,7 +17,7 @@ jobs:
           git fetch origin vm-data
           git checkout vm-data || git checkout -b vm-data
 
-      - name: Run start.sh script
+      - name: Run startup script
         run: |
           chmod +x start.sh
           ./start.sh
