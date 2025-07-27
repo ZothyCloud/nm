@@ -6,31 +6,33 @@ on:
 jobs:
   start-vm:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Fetch vm-data branch
-        run: |
-          git fetch origin vm-data || echo "No vm-data branch found."
-          git checkout vm-data -- vm_data || echo "No vm_data to restore"
+    - name: Restore previous VM data
+      run: |
+        git fetch origin vm-data || echo "No vm-data branch found."
+        if git show origin/vm-data:vm_data >/dev/null 2>&1; then
+          git checkout origin/vm-data -- vm_data
+        else
+          mkdir -p vm_data
+        fi
 
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y unzip curl
+    - name: Start VM with ttyd + Cloudflare
+      run: bash start.sh
 
-      - name: Download ttyd
-        run: |
-          wget https://github.com/tsl0922/ttyd/releases/download/1.7.3/ttyd_linux.x86_64 -O ttyd
-          chmod +x ttyd
-
-      - name: Download cloudflared
-        run: |
-          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -O cloudflared
-          chmod +x cloudflared
-
-      - name: Run start.sh
-        run: |
-          chmod +x start.sh
-          ./start.sh
+    - name: Commit & Push VM data
+      if: always()
+      run: |
+        git config --global user.email "save@vm.com"
+        git config --global user.name "VM Backup"
+        git checkout --orphan temp-backup
+        git rm -rf .
+        cp -r vm_data/* .
+        git add .
+        git commit -m "Backup VM data"
+        git branch -D vm-data || true
+        git branch vm-data
+        git push -f origin vm-data
